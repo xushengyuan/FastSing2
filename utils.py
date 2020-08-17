@@ -2,12 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import matplotlib
+import pyworld as pw
 import matplotlib
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 from scipy.io import wavfile
 import os
+import soundfile as sf
 
 import text
 import hparams as hp
@@ -69,6 +70,7 @@ def plot_data(data, titles=None, filename=None):
 
     for i in range(len(data)):
         spectrogram, pitch, energy = data[i]
+#         spectrogram=np.swapaxes(spectrogram,0,1)
         axes[i][0].imshow(spectrogram, origin='lower')
         axes[i][0].set_aspect(2.5, adjustable='box')
         axes[i][0].set_ylim(0, hp.n_mel_channels)
@@ -127,6 +129,52 @@ def melgan_infer(mel, melgan, path):
     wav = wav.astype('int16')
     wavfile.write(path, hp.sampling_rate, wav)
 
+    
+def world_infer(ap,sp,f0):
+#     ap=np.swapaxes(ap,0,1)
+#     sp=np.swapaxes(sp,0,1)
+    f0=440.0*2**((f0-69)/12)
+
+    arr1=[]
+    for i in range(sp.shape[0]):
+        tmp=np.zeros(513)
+        tmp.fill(512)
+        x=np.concatenate([np.arange(512),tmp],axis=0)
+#         print(sp[i].shape)
+        y_hat=np.interp(x,
+                     np.linspace(0,512,128),
+                     sp[i])
+        y_hat[512:]*=2
+        arr1.append(y_hat)
+    sp=np.stack(arr1)
+#     plt.matshow(sp)
+#     plt.cla()
+
+    arr2=[]
+    for i in range(ap.shape[0]):
+        arr2.append(np.interp(np.arange(1025),
+                     np.linspace(0,1025,32),
+                     ap[i]))
+    ap=np.stack(arr2)
+#     plt.matshow(ap)
+#     plt.savefig('out_ap.png')
+    sp=np.exp(sp)
+#         ap=(ap+18.0)/20.0
+    #     print(ap.max(),ap.min(),ap.mean())
+
+#     print(f0.shape,sp.shape,ap.shape)
+    length=min(f0.shape[0],sp.shape[0],ap.shape[0])
+    f0=f0[:length]
+    sp=sp[:length]
+    ap=ap[:length]
+#     print(f0.shape,sp.shape,ap.shape)
+    y = pw.synthesize(f0, sp, ap, 32000, 8.0)
+#     sf.write(path,y,32000)
+    return y
+# sp=np.load('/ssd/mu_yao/preprocessed/fastsing_dataset/sp/fastsing_dataset-sp-012_13.npy')
+# ap=np.load('/ssd/mu_yao/preprocessed/fastsing_dataset/ap/fastsing_dataset-ap-012_13.npy')
+# f0=np.load('/ssd/mu_yao/preprocessed/fastsing_dataset/f0/fastsing_dataset-f0-012_13.npy')
+# y=world_infer(ap,sp,f0,'out.wav')
 def get_melgan():
     melgan = torch.hub.load('seungwonpark/melgan', 'melgan')
     melgan.eval()

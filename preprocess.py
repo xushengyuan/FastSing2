@@ -1,5 +1,5 @@
 import os
-from data import fastsing_dataset
+from data import fastsing_dataset 
 import hparams as hp
 
 def write_metadata(train,val, out_dir):

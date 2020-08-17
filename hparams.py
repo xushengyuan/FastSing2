@@ -60,8 +60,8 @@ max_seq_len = 4096
 # Quantization for F0 and energy
 ### for LJSpeech ###
 f0_min = 0.0
-f0_max = 70.0
-energy_min = -16
+f0_max = 81.0
+energy_min = -20
 energy_max = 0
 ### for Blizzard2013 ###
 #f0_min = 71.0
@@ -84,8 +84,9 @@ val_rate=0.01
 
 
 # Optimizer
-batch_size = 32
-epochs = 1000
+batch_size = 12
+epochs = 5000
+learning_rate=1e-4
 n_warm_up_step = 4000
 grad_clip_thresh = 1.0
 acc_steps = 1
@@ -102,7 +103,7 @@ log_offset = 1.
 
 
 # Save, log and synthesis
-save_step = 500
+save_step = 1000
 synth_step = 500
 eval_step = 1000
 eval_size = 256

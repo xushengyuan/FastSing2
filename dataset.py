@@ -28,6 +28,7 @@ class Dataset(Dataset):
         condition_path = os.path.join(
             hp.preprocessed_path, "condition", "{}-condition-{}.npy".format(hp.dataset, basename))
         condition = np.load(condition_path).T
+#         print(condition)
         
         mel_refer_path = os.path.join(
             hp.preprocessed_path, "mel", "{}-mel-{}.npy".format(hp.dataset, basename))
@@ -49,15 +50,20 @@ class Dataset(Dataset):
         D_path = os.path.join(
             hp.preprocessed_path, "alignment", "{}-ali-{}.npy".format(hp.dataset, basename))
         D = np.load(D_path)
-        D=np.where(D<=0,1,D)
+        D=np.clip(D,0,1000)
+        
+#         print(D)
+#         print(condition[:,2])
         
         f0_path = os.path.join(
             hp.preprocessed_path, "f0", "{}-f0-{}.npy".format(hp.dataset, basename))
         f0 = np.load(f0_path)
+        f0=np.clip(f0,0,81)
         
         energy_path = os.path.join(
             hp.preprocessed_path, "energy", "{}-energy-{}.npy".format(hp.dataset, basename))
         energy = np.load(energy_path)
+        energy=np.clip(energy,-20,0)
         
         if hp.vocoder=='WORLD':
             sample = {"id": basename,

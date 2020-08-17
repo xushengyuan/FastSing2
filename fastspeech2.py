@@ -6,6 +6,7 @@ from transformer.Models import Encoder, Decoder
 from transformer.Layers import PostNet
 from modules import VarianceAdaptor
 from utils import get_mask_from_lengths
+import matplotlib.pyplot as plt
 import hparams as hp
 # from GST import GST
 
@@ -34,8 +35,11 @@ class FastSpeech2(nn.Module):
         if self.use_postnet:
             self.postnet = PostNet()
 
-    def forward(self, src_seq,ref_mel, src_len, mel_len=None, d_target=None, p_target=None, e_target=None, max_src_len=None, max_mel_len=None):
+    def forward(self, src_seq, src_len, mel_len=None, d_target=None, p_target=None, e_target=None, max_src_len=None, max_mel_len=None):
+#         print(src_seq.shape)
+#         print(src_len.shape)
         src_mask = get_mask_from_lengths(src_len, max_src_len)
+#         print(src_mask.shape)
         mel_mask = get_mask_from_lengths(mel_len, max_mel_len) if mel_len is not None else None
         if hp.vocoder=='WORLD':
             ap_mask = get_mask_from_lengths(mel_len, max_mel_len) if mel_len is not None else None
@@ -50,10 +54,14 @@ class FastSpeech2(nn.Module):
         encoder_output= encoder_output
 
         variance_adaptor_output, d_prediction, p_prediction, e_prediction, mel_len, mel_mask = self.variance_adaptor(
-                    encoder_output, src_mask, mel_mask, d_target, p_target, e_target, max_mel_len)
-        
+                    encoder_output, src_seq, src_mask, mel_mask, d_target, p_target, e_target, max_mel_len)
+#         print( variance_adaptor_output.shape)
+#         plt.matshow( variance_adaptor_output[0].detach().cpu().numpy())
+#         plt.savefig('variance_adaptor_output.png')
+#         plt.cla()
+#         print(mel_mask)
         decoder_output = self.decoder(variance_adaptor_output, mel_mask)
-        
+#         print(sp_mask[0])
 #         if hp.vocoder=='WORLD':
 #             f0_decoder_output = self.f0_decoder(variance_adaptor_output, mel_mask)
 
@@ -68,7 +76,8 @@ class FastSpeech2(nn.Module):
             else:
                 sp_output_postnet = sp_output
 
-            return ap_output, sp_output, sp_output_postnet, d_prediction, p_prediction, e_prediction, src_mask, ap_mask, sp_mask
+            return ap_output, sp_output, sp_output_postnet, d_prediction, p_prediction, e_prediction, src_mask, ap_mask, sp_mask,variance_adaptor_output,decoder_output
+
         else:
             mel_output = self.mel_linear(decoder_output)
 

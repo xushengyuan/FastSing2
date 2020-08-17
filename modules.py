@@ -10,6 +10,8 @@ import math
 import hparams as hp
 import utils
 
+from transformer.Models import Encoder, Decoder
+
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 device='cuda'
 
@@ -21,27 +23,31 @@ class VarianceAdaptor(nn.Module):
 
     def __init__(self):
         super(VarianceAdaptor, self).__init__()
-        self.duration_predictor = VariancePredictor()
+        self.duration_predictor = LengthPredictor(n_layers=4)
+        
+
         self.length_regulator = LengthRegulator()
-        self.pitch_predictor = VariancePredictor()
-        self.energy_predictor = VariancePredictor()
+        self.pitch_predictor = VariancePredictor(n_layers=4)
+        self.energy_predictor = VariancePredictor(n_layers=4)
+        self.relu=nn.ReLU()
         
 #         self.pitch_bins = nn.Parameter(torch.exp(torch.linspace(np.log(hp.f0_min), np.log(hp.f0_max), hp.n_bins-1)))
 #         self.energy_bins = nn.Parameter(torch.linspace(hp.energy_min, hp.energy_max, hp.n_bins-1))
         self.pitch_embedding = nn.Embedding(hp.n_bins*2, hp.encoder_hidden)
         self.energy_embedding = nn.Embedding(hp.n_bins*2, hp.encoder_hidden)
+        
     
-    def forward(self, x, src_mask, mel_mask=None, duration_target=None, pitch_target=None, energy_target=None, max_len=None):
-
-        log_duration_prediction = self.duration_predictor(x, src_mask)
+    def forward(self, x, src_seq, src_mask, mel_mask=None, duration_target=None, pitch_target=None, energy_target=None, max_len=None):
+        log_duration_prediction = self.duration_predictor(x,src_seq, src_mask)
         if duration_target is not None:
             x, mel_len = self.length_regulator(x, duration_target, max_len)
         else:
-            duration_rounded = torch.clamp(torch.round(torch.exp(log_duration_prediction)-hp.log_offset), min=0)
+            duration_rounded = torch.clamp(torch.round(log_duration_prediction), min=0)
             x, mel_len = self.length_regulator(x, duration_rounded, max_len)
             mel_mask = utils.get_mask_from_lengths(mel_len)
-        
-        pitch_prediction = self.pitch_predictor(x, mel_mask)
+#         print(mel_mask)
+        pitch_prediction = self.relu(self.pitch_predictor(x, mel_mask))
+#         print(pitch_prediction)
         if pitch_target is not None:
             src=torch.ceil((pitch_target-hp.f0_min)/(hp.f0_max-hp.f0_min)*hp.n_bins).long()
 #             print(src)
@@ -106,38 +112,17 @@ class LengthRegulator(nn.Module):
 
 
 class VariancePredictor(nn.Module):
-    """ Duration, Pitch and Energy Predictor """
+    """ Pitch and Energy Predictor """
 
-    def __init__(self):
+    def __init__(self,n_layers):
         super(VariancePredictor, self).__init__()
 
-        self.input_size = hp.encoder_hidden
-        self.filter_size = hp.variance_predictor_filter_size
-        self.kernel = hp.variance_predictor_kernel_size
-        self.conv_output_size = hp.variance_predictor_filter_size
-        self.dropout = hp.variance_predictor_dropout
-
-        self.conv_layer = nn.Sequential(OrderedDict([
-            ("conv1d_1", Conv(self.input_size,
-                              self.filter_size,
-                              kernel_size=self.kernel,
-                              padding=(self.kernel-1)//2)),
-            ("relu_1", nn.ReLU()),
-            ("layer_norm_1", nn.LayerNorm(self.filter_size)),
-            ("dropout_1", nn.Dropout(self.dropout)),
-            ("conv1d_2", Conv(self.filter_size,
-                              self.filter_size,
-                              kernel_size=self.kernel,
-                              padding=1)),
-            ("relu_2", nn.ReLU()),
-            ("layer_norm_2", nn.LayerNorm(self.filter_size)),
-            ("dropout_2", nn.Dropout(self.dropout))
-        ]))
-
-        self.linear_layer = nn.Linear(self.conv_output_size, 1)
+        self.decoder = Decoder(n_layers)
+        self.linear_layer = nn.Linear(hp.decoder_hidden, 1)
 
     def forward(self, encoder_output, mask):
-        out = self.conv_layer(encoder_output)
+        
+        out = self.decoder(encoder_output,mask)
         out = self.linear_layer(out)
         out = out.squeeze(-1)
         
@@ -146,6 +131,30 @@ class VariancePredictor(nn.Module):
         
         return out
 
+class LengthPredictor(nn.Module):
+    """ Duration Predictor """
+
+    def __init__(self,n_layers):
+        super(LengthPredictor, self).__init__()
+
+        self.decoder = Decoder(n_layers)
+        self.linear_layer = nn.Linear(hp.decoder_hidden, 1)
+        self.tanh=nn.Tanh()
+        
+    def forward(self, encoder_output,src_seq, mask):
+#         print(mask.shape,encoder_output.shape)
+        out = self.decoder(encoder_output,mask)
+        out = self.linear_layer(out)
+        out = out.squeeze(-1)
+        
+        if mask is not None:
+            out = out.masked_fill(mask, 0.)
+        lengths=src_seq[:,:,2]
+#         print(out.shape,lengths.shape)
+        out=(self.tanh(out)+1.0)/2.0
+        out=out*lengths
+        
+        return out
 
 class Conv(nn.Module):
     """

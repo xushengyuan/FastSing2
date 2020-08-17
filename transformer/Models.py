@@ -18,7 +18,7 @@ def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):
 
     sinusoid_table = np.array([get_posi_angle_vec(pos_i)
                                for pos_i in range(n_position)])
-
+    
     sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
     sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
 
@@ -53,7 +53,7 @@ class Encoder(nn.Module):
         self.src_word_emb2=nn.Embedding(n_src_vocab, d_word_vec, padding_idx=Constants.PAD) 
         self.position_enc = nn.Parameter(
             get_sinusoid_encoding_table(n_position, d_word_vec).unsqueeze(0), requires_grad=False)
-
+        
         self.layer_stack = nn.ModuleList([FFTBlock(
             d_model, d_inner, n_head, d_k, d_v, dropout=dropout) for _ in range(n_layers)])
 
@@ -67,6 +67,7 @@ class Encoder(nn.Module):
         
 #         print(self.src_word_emb0)
 #         print(src_seq.max(),src_seq.min())
+#         print(src_seq[0,:,1])
         src_word_emb_output=self.src_word_emb0(src_seq[:,:,0])\
         +self.src_word_emb1(src_seq[:,:,1])+self.src_word_emb2(src_seq[:,:,2])
 #         for i in range(1,hp.n_condition):
@@ -94,7 +95,7 @@ class Decoder(nn.Module):
 
     def __init__(self,
                  len_max_seq=hp.max_seq_len,
-                 d_word_vec=hp.encoder_hidden,
+                 d_word_vec=hp.decoder_hidden,
                  n_layers=hp.decoder_layer,
                  n_head=hp.decoder_head,
                  d_k=hp.decoder_hidden // hp.decoder_head,
@@ -106,10 +107,10 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
 
         n_position = len_max_seq + 1
-
+#         print(n_position)
         self.position_enc = nn.Parameter(
-            get_sinusoid_encoding_table(n_position, d_word_vec).unsqueeze(0), requires_grad=False)
-
+            get_sinusoid_encoding_table(4097, d_word_vec).unsqueeze(0), requires_grad=False)
+#         print( self.position_enc.shape)
         self.layer_stack = nn.ModuleList([FFTBlock(
             d_model, d_inner, n_head, d_k, d_v, dropout=dropout) for _ in range(n_layers)])
 
@@ -117,7 +118,8 @@ class Decoder(nn.Module):
 
         dec_slf_attn_list = []
         batch_size, max_len = enc_seq.shape[0], enc_seq.shape[1]
-
+        
+#         mask.fill_(Tr)
         # -- Prepare masks
         slf_attn_mask = mask.unsqueeze(1).expand(-1, max_len, -1)
 
@@ -125,7 +127,9 @@ class Decoder(nn.Module):
         if not self.training and enc_seq.shape[1] > hp.max_seq_len:
             dec_output = enc_seq + get_sinusoid_encoding_table(enc_seq.shape[1], hp.decoder_hidden)[:enc_seq.shape[1], :].unsqueeze(0).expand(batch_size, -1, -1).to(enc_seq.device)
         else:
-            dec_output = enc_seq + self.position_enc[:, :max_len, :].expand(batch_size, -1, -1)
+            position_out=self.position_enc[:, :max_len, :].expand(batch_size, -1, -1)
+#             print(self.position_enc.shape,position_out.shape)
+            dec_output = enc_seq + position_out
 
         for dec_layer in self.layer_stack:
             dec_output, dec_slf_attn = dec_layer(
@@ -134,5 +138,5 @@ class Decoder(nn.Module):
                 slf_attn_mask=slf_attn_mask)
             if return_attns:
                 dec_slf_attn_list += [dec_slf_attn]
-
+#         print(dec_output[0])
         return dec_output

@@ -17,16 +17,17 @@ class FastSpeech2Loss(nn.Module):
         if hp.vocoder=='WORLD':
             ap_target.requires_grad = False
             sp_target.requires_grad = False
-#             print(src_mask)
+#             print(p_target)
+#            print(src_mask)
 #             print(sp_mask)
 #             print(sp_output.shape,sp_target.shape)
-
-#             log_d_predicted = log_d_predicted.masked_select(src_mask)
-#             log_d_target = log_d_target.masked_select(src_mask)
-#             p_predicted = p_predicted.masked_select(sp_mask)
-#             p_target = p_target.masked_select(sp_mask)
-#             e_predicted = e_predicted.masked_select(sp_mask)
-#             e_target = e_target.masked_select(sp_mask)
+            #print(log_d_predicted,log_d_target)
+            #log_d_predicted = log_d_predicted.masked_select(src_mask)
+            #log_d_target = log_d_target.masked_select(src_mask)
+            #p_predicted = p_predicted.masked_select(sp_mask)
+            #p_target = p_target.masked_select(sp_mask)
+            #e_predicted = e_predicted.masked_select(sp_mask)
+            #e_target = e_target.masked_select(sp_mask)
         else:
             mel_target.requires_grad = False
             log_d_predicted = log_d_predicted.masked_select(src_mask)
@@ -39,9 +40,11 @@ class FastSpeech2Loss(nn.Module):
         
 
         d_loss = self.mae_loss(log_d_predicted, log_d_target)
+        #print(log_d_predicted,log_d_target)
         p_loss = self.mae_loss(p_predicted, p_target)
+#         print(p_predicted[0],p_target[0])
         e_loss = self.mae_loss(e_predicted, e_target)
-        
+        #print(e_predicted,e_target)
         
         if hp.vocoder=='WORLD':
 #             sp = sp_output.masked_select(sp_mask.unsqueeze(-1))
