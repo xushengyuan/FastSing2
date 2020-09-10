@@ -75,7 +75,7 @@ def synthesize(model, condition,index ):
 if __name__ == "__main__":
     # Test
     parser = argparse.ArgumentParser()
-    parser.add_argument('--step', type=int, default=70000)
+    parser.add_argument('--step', type=int, default=376000)
     args = parser.parse_args()
     
 

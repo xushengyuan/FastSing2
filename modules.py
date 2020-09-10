@@ -43,7 +43,9 @@ class VarianceAdaptor(nn.Module):
             x, mel_len = self.length_regulator(x, duration_target, max_len)
         else:
             duration_rounded = torch.clamp(torch.round(log_duration_prediction), min=0)
+            print(log_duration_prediction)
             x, mel_len = self.length_regulator(x, duration_rounded, max_len)
+#             print(mel_len)
             mel_mask = utils.get_mask_from_lengths(mel_len)
 #         print(mel_mask)
         pitch_prediction = self.relu(self.pitch_predictor(x, mel_mask))
@@ -146,14 +148,14 @@ class LengthPredictor(nn.Module):
         out = self.decoder(encoder_output,mask)
         out = self.linear_layer(out)
         out = out.squeeze(-1)
-        
+#         print(out)
         if mask is not None:
             out = out.masked_fill(mask, 0.)
         lengths=src_seq[:,:,2]
 #         print(out.shape,lengths.shape)
-        out=(self.tanh(out)+1.0)/2.0
+        out=(self.tanh(out)+1.0)
         out=out*lengths
-        
+#         print(out)
         return out
 
 class Conv(nn.Module):

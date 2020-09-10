@@ -42,7 +42,7 @@ def get_target(x,fs,n_ap_channels,n_sp_channels):
     # plt.show()
     arr=[]
     for i in range(sp.shape[0]):
-        arr.append(np.interp(np.linspace(0,512,n_sp_channels),np.arange(512),sp[i][:512])[np.newaxis,:])
+        arr.append(np.interp(np.linspace(0,1025,n_sp_channels),np.arange(1025),sp[i])[np.newaxis,:])
     _sp=np.concatenate(arr,axis=0)
 
     

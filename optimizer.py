@@ -1,5 +1,5 @@
 import numpy as np
-
+import hparams as hp
 
 class ScheduledOptim():
     ''' A simple wrapper class for learning rate scheduling '''
@@ -26,7 +26,8 @@ class ScheduledOptim():
     def _update_learning_rate(self):
         ''' Learning rate scheduling per step '''
         self.n_current_steps += 1
-        lr = self.init_lr * self._get_lr_scale()
+        #lr = self.init_lr * self._get_lr_scale()
+        lr=hp.learning_rate
 
         for param_group in self._optimizer.param_groups:
             param_group['lr'] = lr

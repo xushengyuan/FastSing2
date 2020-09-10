@@ -42,7 +42,14 @@ def pad_words(words,sentence):
     if sentence[1]>words[-1][1]:
         words=words+[[words[-1][1],sentence[1],'',0]]
     # print(words)
-    return words
+    _words=None
+    for i in range(1,len(words)):
+        if words[i-1][1]!=words[i][0]:
+            _words=words[:i]+[[words[i-1][1],words[i][0],'',0]]+words[i:]
+    if _words is None:
+        _words=words
+    print(_words)
+    return _words
         
 def get_D(words):
     D=[]
@@ -103,6 +110,7 @@ def get_con2(words):
     return np.array(con2)
 
 def gen(notes,sentence):
+#     print(notes)
     notes=pad_words(notes,sentence)
     D=get_D(notes)
     con1=get_con1(notes)    
@@ -191,7 +199,7 @@ words,begin,end = vsqx2notes(sys.argv[1])
 
 wav=np.zeros(1)
 
-length1=500
+length1=20
 last=begin
 last_n=0
 cot=1
@@ -199,36 +207,30 @@ i=0
 con1s=[]
 con2s=[]
 Ds=[]
+
+part=[]
 while i <len(words)-1:
     if words[i][1]!=words[i+1][0]:
         
+        length2=words[i+1][0]-words[i][1]-10
         
-            
-        if i-1<len(words)-1:
-            length2=min(words[i+1][0]-words[i][1],500)
-        else:
-            length2=500
+        begin=last-10
+        end=words[i][1]+length2
         
-        begin=last-length1//2
-        end=words[i][1]+length2//2
-#         print(length1,length2)
         length1=length2
-#         print(i)
         # print(begin,end)
-#         print(words[last_n:i+1])
-        assert end-begin<3000
         print('Part %d: from %d to %d len:%d n_note: %d'%(cot,begin,end,end-begin,i+1-last_n))
-        con1,con2,D=gen(words[last_n:i+1],(begin,end,'-'))
-
+#         con1,con2,D=gen(words[last_n:i+1],(begin,end,'-'))
+        part.append([last_n,i+1,begin,end])
         # print(con1)
         # print(con2)
         # print(D)
 
 #         D=process_D(D)
         # print(D)
-        con1s.append(con1)
-        con2s.append(con2)
-        Ds.append(D)
+#         con1s.append(con1)
+#         con2s.append(con2)
+#         Ds.append(D)
         
         last=words[i+1][0]
         last_n=i+1
@@ -242,15 +244,35 @@ begin=last-10
 end=words[i][1]+length2
         
 length1=length2
-assert end-begin<2048
 print('Part %d: from %d to %d len:%d n_note: %d'%(cot,begin,end,end-begin,i+1-last_n))
-con1,con2,D=gen(words[last_n:i+1],(begin,end,'-'))
+# con1,con2,D=gen(words[last_n:i+1],(begin,end,'-'))
+part.append([last_n,i+1,begin,end])
+
+# print(part)
+# print(words)
+
+i=0
+while(i<len(part)):
+    if i+1<len(part) and part[i+1][0]-part[i][1]<300:
+        con1,con2,D=gen(words[part[i][0]:part[i+1][1]],(part[i][2],part[i+1][3],'-'))
+        con1s.append(con1)
+        con2s.append(con2)
+        Ds.append(D)
+        i+=2
+    else:
+        con1,con2,D=gen(words[part[i][0]:part[i][1]],(part[i][2],part[i][3],'-'))
+        con1s.append(con1)
+        con2s.append(con2)
+        Ds.append(D)
+        i+=1
+        
+    
 
 # D=process_D(D)
 # print(D)
-con1s.append(con1)
-con2s.append(con2)
-Ds.append(D)
+# con1s.append(con1)
+# con2s.append(con2)
+# Ds.append(D)
 
 os.system('rm ./tmp/cons/*')
 # os.system('rm ./tmp/con2s/*')
@@ -259,7 +281,7 @@ os.system('rm ./tmp/cons/*')
 for i in range(len(con1s)):
     
     con=np.stack([con1s[i],con2s[i],Ds[i]])
-    print(con)
+#     print(con)
     _con=np.swapaxes(convert(con),0,1)
     print(_con)
     np.save('./tmp/cons/%03d.npy'%i,_con)

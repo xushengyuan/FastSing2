@@ -28,6 +28,7 @@ class Dataset(Dataset):
         condition_path = os.path.join(
             hp.preprocessed_path, "condition", "{}-condition-{}.npy".format(hp.dataset, basename))
         condition = np.load(condition_path).T
+        condition=np.clip(condition,0,1000)
 #         print(condition)
         
         mel_refer_path = os.path.join(

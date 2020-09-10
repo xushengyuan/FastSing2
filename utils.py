@@ -131,20 +131,17 @@ def melgan_infer(mel, melgan, path):
 
     
 def world_infer(ap,sp,f0):
-#     ap=np.swapaxes(ap,0,1)
-#     sp=np.swapaxes(sp,0,1)
+#     print(ap.shape,sp.shape,f0.shape)
+
     f0=440.0*2**((f0-69)/12)
 
     arr1=[]
     for i in range(sp.shape[0]):
-        tmp=np.zeros(513)
-        tmp.fill(512)
-        x=np.concatenate([np.arange(512),tmp],axis=0)
-#         print(sp[i].shape)
+        x=np.arange(1025)
+        
         y_hat=np.interp(x,
-                     np.linspace(0,512,128),
+                     np.linspace(0,1025,128),
                      sp[i])
-        y_hat[512:]*=2
         arr1.append(y_hat)
     sp=np.stack(arr1)
 #     plt.matshow(sp)
@@ -168,7 +165,7 @@ def world_infer(ap,sp,f0):
     sp=sp[:length]
     ap=ap[:length]
 #     print(f0.shape,sp.shape,ap.shape)
-    y = pw.synthesize(f0, sp, ap, 32000, 8.0)
+    y = pw.synthesize(f0.astype(np.float64), sp.astype(np.float64), ap.astype(np.float64), 32000, 8.0)
 #     sf.write(path,y,32000)
     return y
 # sp=np.load('/ssd/mu_yao/preprocessed/fastsing_dataset/sp/fastsing_dataset-sp-012_13.npy')

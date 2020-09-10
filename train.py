@@ -16,6 +16,7 @@ from evaluate import evaluate
 import hparams as hp
 import utils
 import audio as Audio
+import soundfile as sf
 from prefetch_generator import BackgroundGenerator
 import matplotlib.pyplot as plt
 
@@ -36,7 +37,7 @@ def main(args):
     # Get dataset
     dataset = Dataset("train.txt") 
     loader = DataLoaderX(dataset, batch_size=hp.batch_size*4, shuffle=True, 
-        collate_fn=dataset.collate_fn, drop_last=True, num_workers=32)
+        collate_fn=dataset.collate_fn, drop_last=True, num_workers=8)
 
     # Define model
     model = nn.DataParallel(FastSpeech2()).to(device)
@@ -242,18 +243,23 @@ def main(args):
                     f0_output = f0_output[0, :length].detach().cpu().numpy()
                     energy_output = energy_output[0, :length].detach().cpu().numpy()
 
-#                     if hp.vocoder == 'melgan':
-#                         utils.melgan_infer(mel_torch, melgan, os.path.join(hp.synth_path, 'step_{}_{}.wav'.format(current_step, hp.vocoder)))
-#                         utils.melgan_infer(mel_postnet_torch, melgan, os.path.join(hp.synth_path, 'step_{}_postnet_{}.wav'.format(current_step, hp.vocoder)))
-#                         utils.melgan_infer(mel_target_torch, melgan, os.path.join(hp.synth_path, 'step_{}_ground-truth_{}.wav'.format(current_step, hp.vocoder)))
-#                     elif hp.vocoder == 'waveglow':
-#                         utils.waveglow_infer(mel_torch, waveglow, os.path.join(hp.synth_path, 'step_{}_{}.wav'.format(current_step, hp.vocoder)))
-#                         utils.waveglow_infer(mel_postnet_torch, waveglow, os.path.join(hp.synth_path, 'step_{}_postnet_{}.wav'.format(current_step, hp.vocoder)))
-#                         utils.waveglow_infer(mel_target_torch, waveglow, os.path.join(hp.synth_path, 'step_{}_ground-truth_{}.wav'.format(current_step, hp.vocoder)))
-#                     elif hp.vocoder=='WORLD':
-#                         utils.world_infer(mel_torch.numpy(),f0_output , os.path.join(hp.synth_path, 'step_{}_{}.wav'.format(current_step, hp.vocoder)))
-#                         utils.world_infer(mel_postnet_torch.numpy(),f0_output, os.path.join(hp.synth_path, 'step_{}_postnet_{}.wav'.format(current_step, hp.vocoder)))
-#                         utils.world_infer(mel_target_torch.numpy(),f0,  os.path.join(hp.synth_path, 'step_{}_ground-truth_{}.wav'.format(current_step, hp.vocoder)))
+                    if hp.vocoder == 'melgan':
+                        utils.melgan_infer(mel_torch, melgan, os.path.join(hp.synth_path, 'step_{}_{}.wav'.format(current_step, hp.vocoder)))
+                        utils.melgan_infer(mel_postnet_torch, melgan, os.path.join(hp.synth_path, 'step_{}_postnet_{}.wav'.format(current_step, hp.vocoder)))
+                        utils.melgan_infer(mel_target_torch, melgan, os.path.join(hp.synth_path, 'step_{}_ground-truth_{}.wav'.format(current_step, hp.vocoder)))
+                    elif hp.vocoder == 'waveglow':
+                        utils.waveglow_infer(mel_torch, waveglow, os.path.join(hp.synth_path, 'step_{}_{}.wav'.format(current_step, hp.vocoder)))
+                        utils.waveglow_infer(mel_postnet_torch, waveglow, os.path.join(hp.synth_path, 'step_{}_postnet_{}.wav'.format(current_step, hp.vocoder)))
+                        utils.waveglow_infer(mel_target_torch, waveglow, os.path.join(hp.synth_path, 'step_{}_ground-truth_{}.wav'.format(current_step, hp.vocoder)))
+                    elif hp.vocoder=='WORLD':
+                        #     ap=np.swapaxes(ap,0,1)
+                        #     sp=np.swapaxes(sp,0,1)
+                        wav=utils.world_infer(np.swapaxes(ap_torch[0].cpu().numpy(),0,1),
+                                              np.swapaxes(sp_postnet_torch[0].cpu().numpy(),0,1),f0_output)
+                        sf.write(os.path.join(hp.synth_path, 'step_{}_postnet_{}.wav'.format(current_step, hp.vocoder)),wav,32000)
+                        wav=utils.world_infer(np.swapaxes(ap_target_torch[0].cpu().numpy(),0,1),
+                                              np.swapaxes(sp_target_torch[0].cpu().numpy(),0,1),f0)
+                        sf.write(os.path.join(hp.synth_path, 'step_{}_ground-truth_{}.wav'.format(current_step, hp.vocoder)),wav,32000)
                     
                     utils.plot_data([(sp_postnet_torch[0].cpu().numpy(), f0_output, energy_output), (sp_target_torch[0].cpu().numpy(), f0, energy)], 
                         ['Synthetized Spectrogram', 'Ground-Truth Spectrogram'], filename=os.path.join(synth_path, 'step_{}.png'.format(current_step)))
@@ -263,9 +269,9 @@ def main(args):
                     plt.matshow(ap_torch[0].cpu().numpy())
                     plt.savefig(os.path.join(synth_path, 'ap_{}.png'.format(current_step)))
                     plt.matshow(variance_adaptor_output[0].detach().cpu().numpy())
-                    plt.savefig(os.path.join(synth_path, 'va_{}.png'.format(current_step)))
-                    plt.matshow(decoder_output[0].detach().cpu().numpy())
-                    plt.savefig(os.path.join(synth_path, 'encoder_{}.png'.format(current_step)))
+#                     plt.savefig(os.path.join(synth_path, 'va_{}.png'.format(current_step)))
+#                     plt.matshow(decoder_output[0].detach().cpu().numpy())
+#                     plt.savefig(os.path.join(synth_path, 'encoder_{}.png'.format(current_step)))
 
                     plt.cla()
                     fout=open(os.path.join(synth_path, 'D_{}.txt'.format(current_step)),'w')

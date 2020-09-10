@@ -84,9 +84,10 @@ val_rate=0.01
 
 
 # Optimizer
-batch_size = 12
+batch_size = 8
+
 epochs = 5000
-learning_rate=1e-4
+learning_rate=5e-5
 n_warm_up_step = 4000
 grad_clip_thresh = 1.0
 acc_steps = 1
@@ -103,9 +104,9 @@ log_offset = 1.
 
 
 # Save, log and synthesis
-save_step = 1000
-synth_step = 500
-eval_step = 1000
+save_step = 2000
+synth_step = 5000
+eval_step = 10000
 eval_size = 256
 log_step = 1
 clear_Time = 20
