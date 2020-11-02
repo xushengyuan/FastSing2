@@ -67,9 +67,10 @@ class Encoder(nn.Module):
         
 #         print(self.src_word_emb0)
 #         print(src_seq.max(),src_seq.min())
-#         print(src_seq[0,:,1])
+#        print('src_seq',src_seq.shape)
         src_word_emb_output=self.src_word_emb0(src_seq[:,:,0])\
         +self.src_word_emb1(src_seq[:,:,1])+self.src_word_emb2(src_seq[:,:,2])
+#        print('src_word_emb_output',torch.mean(src_word_emb_output))
 #         for i in range(1,hp.n_condition):
 #             src_word_emb_output+=self.src_word_embs[i](src_seq[:,:,i])
             
@@ -84,6 +85,7 @@ class Encoder(nn.Module):
                 enc_output,
                 mask=mask,
                 slf_attn_mask=slf_attn_mask)
+#            print('enc_output',torch.mean(enc_output))
             if return_attns:
                 enc_slf_attn_list += [enc_slf_attn]
 
@@ -117,6 +119,7 @@ class Decoder(nn.Module):
     def forward(self, enc_seq, mask, return_attns=False):
 
         dec_slf_attn_list = []
+#        print(enc_seq.shape)
         batch_size, max_len = enc_seq.shape[0], enc_seq.shape[1]
         
 #         mask.fill_(Tr)
@@ -130,7 +133,7 @@ class Decoder(nn.Module):
             position_out=self.position_enc[:, :max_len, :].expand(batch_size, -1, -1)
 #             print(self.position_enc.shape,position_out.shape)
             dec_output = enc_seq + position_out
-
+#        print(dec_output.shape,mask.shape,slf_attn_mask.shape)
         for dec_layer in self.layer_stack:
             dec_output, dec_slf_attn = dec_layer(
                 dec_output,

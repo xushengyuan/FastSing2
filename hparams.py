@@ -2,7 +2,7 @@ import os
 
 # Dataset
 dataset = "fastsing_dataset"
-data_path = "/ssd/mu_yao"
+data_path = "../mu_yao"
 #dataset = "Blizzard2013"
 #data_path = "./Blizzard-2013/train/segmented/"
 
@@ -50,44 +50,51 @@ fft_conv1d_kernel_size = (9, 1)
 encoder_dropout = 0.2
 decoder_dropout = 0.2
 
-variance_predictor_filter_size = 256
-variance_predictor_kernel_size = 3
-variance_predictor_dropout = 0.5
+
+variance_predictor_dropout = 0.2
+variance_predictor_layer = 4
+variance_predictor_head = 2
+variance_predictor_hidden = 256
+length_predictor_dropout = 0.2
+length_predictor_layer = 4
+length_predictor_head = 2
+length_predictor_hidden = 256
 
 max_seq_len = 4096
 
 
 # Quantization for F0 and energy
 ### for LJSpeech ###
-f0_min = 0.0
-f0_max = 81.0
-energy_min = -20
-energy_max = 0
+f0_min = 40.0
+f0_max = 90.0
+energy_min = 0
+energy_max = 1
 ### for Blizzard2013 ###
 #f0_min = 71.0
 #f0_max = 786.7
 #energy_min = 21.23
 #energy_max = 101.02
 
-n_bins = 256
+n_bins = 128
 
 
 # Checkpoints and synthesis path
-preprocessed_path = os.path.join("/ssd/mu_yao/preprocessed/", dataset)
+preprocessed_path = os.path.join("../mu_yao/preprocessed/", dataset)
 checkpoint_path = os.path.join("./ckpt/", dataset)
 synth_path = os.path.join("./synth/", dataset)
 eval_path = os.path.join("./eval/", dataset)
 log_path = os.path.join("./log/", dataset)
 test_path = "./results"
 
-val_rate=0.01
+val_rate=0.00001
 
 
 # Optimizer
-batch_size = 8
+batch_size = 16	
 
-epochs = 5000
+epochs = 1000
 learning_rate=5e-5
+learning_rate_ratio=1/8
 n_warm_up_step = 4000
 grad_clip_thresh = 1.0
 acc_steps = 1
@@ -105,7 +112,7 @@ log_offset = 1.
 
 # Save, log and synthesis
 save_step = 2000
-synth_step = 5000
+synth_step = 1000
 eval_step = 10000
 eval_size = 256
 log_step = 1

@@ -66,7 +66,7 @@ class STFT(torch.nn.Module):
             input_data.cuda(),
             Variable(self.forward_basis, requires_grad=False).cuda(),
             stride=self.hop_length,
-            padding=0).cpu()
+            padding=0)
 
         cutoff = int((self.filter_length / 2) + 1)
         real_part = forward_transform[:, :cutoff, :]

@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import hparams as hp
 # from GST import GST
 
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-device='cuda'
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#device='cpu'
 class FastSpeech2(nn.Module):
     """ FastSpeech2 """
 
@@ -21,7 +21,9 @@ class FastSpeech2(nn.Module):
 #         self.gst = GST()
         self.encoder = Encoder()
         self.variance_adaptor = VarianceAdaptor()
-
+        
+        self.encoder_linear = nn.Linear(hp.encoder_hidden, hp.decoder_hidden)
+        
         self.decoder = Decoder()
         
         if hp.vocoder=='WORLD':
@@ -35,7 +37,7 @@ class FastSpeech2(nn.Module):
         if self.use_postnet:
             self.postnet = PostNet()
 
-    def forward(self, src_seq, src_len, mel_len=None, d_target=None, p_target=None, e_target=None, max_src_len=None, max_mel_len=None):
+    def forward(self, src_seq, src_len, mel_len=None, d_target=None, p_target=None, p_norm=None, e_target=None, max_src_len=None, max_mel_len=None):
 #         print(src_seq.shape)
 #         print(src_len.shape)
         src_mask = get_mask_from_lengths(src_len, max_src_len)
@@ -54,12 +56,13 @@ class FastSpeech2(nn.Module):
         encoder_output= encoder_output
 
         variance_adaptor_output, d_prediction, p_prediction, e_prediction, mel_len, mel_mask = self.variance_adaptor(
-                    encoder_output, src_seq, src_mask, mel_mask, d_target, p_target, e_target, max_mel_len)
+                    encoder_output, src_seq, src_mask, mel_mask, d_target, p_target, p_norm, e_target, max_mel_len)
 #         print( variance_adaptor_output.shape)
 #         plt.matshow( variance_adaptor_output[0].detach().cpu().numpy())
 #         plt.savefig('variance_adaptor_output.png')
 #         plt.cla()
 #         print(mel_mask)
+       # encoder_linear_output = self.encoder_linear(variance_adaptor_output)
         decoder_output = self.decoder(variance_adaptor_output, mel_mask)
 #         print(sp_mask[0])
 #         if hp.vocoder=='WORLD':
@@ -76,7 +79,7 @@ class FastSpeech2(nn.Module):
             else:
                 sp_output_postnet = sp_output
 
-            return ap_output, sp_output, sp_output_postnet, d_prediction, p_prediction, e_prediction, src_mask, ap_mask, sp_mask,variance_adaptor_output,decoder_output
+            return ap_output, sp_output, sp_output_postnet, d_prediction, p_prediction, e_prediction, src_mask, ap_mask, sp_mask,encoder_output,variance_adaptor_output,decoder_output
 
         else:
             mel_output = self.mel_linear(decoder_output)

@@ -21,10 +21,11 @@ def herz2note(x):
 def note2herz(n):
     return 440.0*2**((n-69)/12)
 
-def get_target(x,fs,n_ap_channels,n_sp_channels):
-    _f0, t = pw.dio(x,fs, f0_floor=120.0, f0_ceil=750.0,
+def get_target(x,fs,n_ap_channels,n_sp_channels,f0):
+    _f0, t = pw.dio(x,fs, f0_floor=75.0, f0_ceil=1000.0,
                     frame_period=8.0)
-    f0_herz = pw.stonemask(x, _f0, t, fs)
+    f0_herz = f0[:_f0.shape[0]]
+    f0_herz[_f0<1.0]=0.0
     sp = pw.cheaptrick(x, f0_herz, t, fs)
     ap = pw.d4c(x, f0_herz, t, fs)
     # print(sp.shape)
@@ -52,7 +53,7 @@ def get_target(x,fs,n_ap_channels,n_sp_channels):
 #     plt.matshow(mel)
 #     plt.show()
 
-    return _ap,_sp
+    return _ap,_sp,f0_herz
 
 def load_wav_to_torch(full_path):
     sampling_rate, data = read(full_path)

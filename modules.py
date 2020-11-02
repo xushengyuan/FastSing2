@@ -12,8 +12,8 @@ import utils
 
 from transformer.Models import Encoder, Decoder
 
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-device='cuda'
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#device='cpu'
 
 def clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
@@ -23,21 +23,22 @@ class VarianceAdaptor(nn.Module):
 
     def __init__(self):
         super(VarianceAdaptor, self).__init__()
-        self.duration_predictor = LengthPredictor(n_layers=4)
+        self.duration_predictor = LengthPredictor()
         
 
         self.length_regulator = LengthRegulator()
-        self.pitch_predictor = VariancePredictor(n_layers=4)
-        self.energy_predictor = VariancePredictor(n_layers=4)
+        self.pitch_predictor = VariancePredictor()
+        self.energy_predictor = VariancePredictor()
         self.relu=nn.ReLU()
         
 #         self.pitch_bins = nn.Parameter(torch.exp(torch.linspace(np.log(hp.f0_min), np.log(hp.f0_max), hp.n_bins-1)))
 #         self.energy_bins = nn.Parameter(torch.linspace(hp.energy_min, hp.energy_max, hp.n_bins-1))
-        self.pitch_embedding = nn.Embedding(hp.n_bins*2, hp.encoder_hidden)
-        self.energy_embedding = nn.Embedding(hp.n_bins*2, hp.encoder_hidden)
+        self.pitch_embedding = nn.Embedding(hp.n_bins+2, hp.encoder_hidden)
+        self.pitch_norm_embedding = nn.Embedding(hp.n_bins+2, hp.variance_predictor_hidden)
+        self.energy_embedding = nn.Embedding(hp.n_bins+2, hp.encoder_hidden)
         
     
-    def forward(self, x, src_seq, src_mask, mel_mask=None, duration_target=None, pitch_target=None, energy_target=None, max_len=None):
+    def forward(self, x, src_seq, src_mask, mel_mask=None, duration_target=None, pitch_target=None, pitch_norm=None, energy_target=None, max_len=None):
         log_duration_prediction = self.duration_predictor(x,src_seq, src_mask)
         if duration_target is not None:
             x, mel_len = self.length_regulator(x, duration_target, max_len)
@@ -48,13 +49,21 @@ class VarianceAdaptor(nn.Module):
 #             print(mel_len)
             mel_mask = utils.get_mask_from_lengths(mel_len)
 #         print(mel_mask)
-        pitch_prediction = self.relu(self.pitch_predictor(x, mel_mask))
+        if pitch_norm==None:
+            norm_f0=np.zeros(f0.shape[0])
+            for i in range(condition.shape[0]):
+                for j in range(int(D[:i].sum()),min(int(D[:i].sum()+D[i]),f0.shape[0])):
+                        norm_f0[j]=(condition[i][1])
+            pitch_norm=np.clip(norm_f0,40,90)
+            
+        pitch_prediction = self.relu(self.pitch_predictor(x+self.pitch_norm_embedding(pitch_norm.long()), mel_mask))
 #         print(pitch_prediction)
         if pitch_target is not None:
             src=torch.ceil((pitch_target-hp.f0_min)/(hp.f0_max-hp.f0_min)*hp.n_bins).long()
 #             print(src)
             pitch_embedding = self.pitch_embedding(src)
         else:
+            pitch_prediction=torch.clump(pitch_prediction,40,90)
             src=torch.ceil((pitch_prediction-hp.f0_min)/(hp.f0_max-hp.f0_min)*hp.n_bins).long()
             
             pitch_embedding = self.pitch_embedding(src)
@@ -66,6 +75,7 @@ class VarianceAdaptor(nn.Module):
 #             print(src)
             energy_embedding = self.energy_embedding(src)
         else:
+            energy_prediction=torch.clump(energy_prediction,0,1)
             src=torch.ceil((energy_prediction-hp.energy_min)/(hp.energy_max-hp.energy_min)*hp.n_bins).long()
             
             energy_embedding = self.energy_embedding(src)
@@ -116,11 +126,19 @@ class LengthRegulator(nn.Module):
 class VariancePredictor(nn.Module):
     """ Pitch and Energy Predictor """
 
-    def __init__(self,n_layers):
+    def __init__(self,n_layers=hp.variance_predictor_layer):
         super(VariancePredictor, self).__init__()
 
-        self.decoder = Decoder(n_layers)
-        self.linear_layer = nn.Linear(hp.decoder_hidden, 1)
+        self.decoder = Decoder(len_max_seq=hp.max_seq_len,
+                 d_word_vec=hp.variance_predictor_hidden,
+                 n_layers=n_layers,
+                 n_head=hp.variance_predictor_head,
+                 d_k=hp.variance_predictor_hidden // hp.variance_predictor_head,
+                 d_v=hp.variance_predictor_hidden // hp.variance_predictor_head,
+                 d_model=hp.variance_predictor_hidden,
+                 d_inner=hp.fft_conv1d_filter_size,
+                 dropout=hp.variance_predictor_dropout)
+        self.linear_layer = nn.Linear(hp.variance_predictor_hidden, 1)
 
     def forward(self, encoder_output, mask):
         
@@ -136,11 +154,19 @@ class VariancePredictor(nn.Module):
 class LengthPredictor(nn.Module):
     """ Duration Predictor """
 
-    def __init__(self,n_layers):
+    def __init__(self):
         super(LengthPredictor, self).__init__()
 
-        self.decoder = Decoder(n_layers)
-        self.linear_layer = nn.Linear(hp.decoder_hidden, 1)
+        self.decoder = Decoder(len_max_seq=hp.max_seq_len,
+                 d_word_vec=hp.length_predictor_hidden,
+                 n_layers=hp.length_predictor_layer,
+                 n_head=hp.length_predictor_head,
+                 d_k=hp.length_predictor_hidden // hp.length_predictor_head,
+                 d_v=hp.length_predictor_hidden // hp.length_predictor_head,
+                 d_model=hp.length_predictor_hidden,
+                 d_inner=hp.fft_conv1d_filter_size,
+                 dropout=hp.length_predictor_dropout)
+        self.linear_layer = nn.Linear(hp.length_predictor_hidden, 1)
         self.tanh=nn.Tanh()
         
     def forward(self, encoder_output,src_seq, mask):
@@ -151,10 +177,10 @@ class LengthPredictor(nn.Module):
 #         print(out)
         if mask is not None:
             out = out.masked_fill(mask, 0.)
-        lengths=src_seq[:,:,2]
+#         lengths=src_seq[:,:,2]
 #         print(out.shape,lengths.shape)
-        out=(self.tanh(out)+1.0)
-        out=out*lengths
+#         out=(self.tanh(out)+1.0)
+#         out=out*lengths
 #         print(out)
         return out
 

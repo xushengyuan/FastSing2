@@ -31,7 +31,7 @@ def evaluate(model, step):
     
     # Get dataset
     dataset = Dataset("val.txt", sort=False)
-    loader = DataLoader(dataset, batch_size=hp.batch_size**2, shuffle=False, collate_fn=dataset.collate_fn, drop_last=False, num_workers=0, )
+    loader = DataLoader(dataset, batch_size=hp.batch_size*4, shuffle=False, collate_fn=dataset.collate_fn, drop_last=False, num_workers=0, )
     
     # Get loss function
     Loss = FastSpeech2Loss().to(device)
@@ -53,15 +53,16 @@ def evaluate(model, step):
         for j, data_of_batch in enumerate(batchs):
             # Get Data
             id_ = data_of_batch["id"]
-            conditions = [batch[ind]["condition"] for ind in cut_list]
-            mel_refers = [batch[ind]["mel_refer"] for ind in cut_list]
+            condition = torch.from_numpy(data_of_batch["condition"]).long().to(device)
+            mel_refer = torch.from_numpy(data_of_batch["mel_refer"]).float().to(device)
             if hp.vocoder=='WORLD':
-                ap_targets = [batch[ind]["ap_target"] for ind in cut_list]
-                sp_targets = [batch[ind]["sp_target"] for ind in cut_list]
+                ap_target = torch.from_numpy(data_of_batch["ap_target"]).float().to(device)
+                sp_target = torch.from_numpy(data_of_batch["sp_target"]).float().to(device)
             else:
-                mel_targets = [batch[ind]["mel_target"] for ind in cut_list]
-            D = torch.from_numpy(data_of_batch["D"]).int().to(device)
-            log_D = torch.from_numpy(data_of_batch["log_D"]).int().to(device)
+                mel_target = torch.from_numpy(data_of_batch["mel_target"]).float().to(device)
+            D = torch.from_numpy(data_of_batch["D"]).long().to(device)
+            log_D = torch.from_numpy(data_of_batch["log_D"]).float().to(device)
+            #print(D,log_D)
             f0 = torch.from_numpy(data_of_batch["f0"]).float().to(device)
             energy = torch.from_numpy(data_of_batch["energy"]).float().to(device)
             src_len = torch.from_numpy(data_of_batch["src_len"]).long().to(device)
@@ -72,35 +73,35 @@ def evaluate(model, step):
             with torch.no_grad():
                 # Forward
                 if hp.vocoder=='WORLD':
-                    ap_output, sp_output, sp_postnet_output, log_duration_output, f0_output,
-                    energy_output, src_mask, ap_mask,sp_mask, _ = model(
-                    condition,mel_refer, src_len, mel_len, D, f0, energy, max_src_len, max_mel_len)
+#                     print(condition.shape,mel_refer.shape, src_len.shape, mel_len.shape, D.shape, f0.shape, energy.shape, max_src_len.shape, max_mel_len.shape)
+                    ap_output, sp_output, sp_postnet_output, log_duration_output, f0_output,energy_output, src_mask, ap_mask,sp_mask ,variance_adaptor_output,decoder_output= model(
+                    condition, src_len, mel_len, D, f0, energy, max_src_len, max_mel_len)
                 
                     ap_loss, sp_loss, sp_postnet_loss, d_loss, f_loss, e_loss = Loss(
-                        log_duration_output, log_D, f0_output, f0, energy_output, energy, ap_output=ap_output, 
+                        log_duration_output, D, f0_output, f0, energy_output, energy, ap_output=ap_output, 
                         sp_output=sp_output, sp_postnet_output=sp_postnet_output, ap_target=ap_target, 
-                        sp_target=sp_target, sc_mask=src_mask,ap_mask=ap_mask,sp_mask=sp_mask)
+                        sp_target=sp_target,src_mask=src_mask, ap_mask=ap_mask,sp_mask=sp_mask)
                     total_loss = ap_loss + sp_loss + sp_postnet_loss + d_loss + f_loss + e_loss
                 else:
-                    mel_output, mel_postnet_output, log_duration_output, f0_output,
-                    energy_output, src_mask, mel_mask, _ = model(
+                    mel_output, mel_postnet_output, log_duration_output, f0_output,energy_output, src_mask, mel_mask, _ = model(
                     condition,mel_refer, src_len, mel_len, D, f0, energy, max_src_len, max_mel_len)
                     
                     mel_loss, mel_postnet_loss, d_loss, f_loss, e_loss = Loss(
                         log_duration_output, log_D, f0_output, f0, energy_output, energy, mel_output=mel_output,
                         mel_postnet_output=mel_postnet_output, mel_target=mel_target, src_mask=~src_mask, mel_mask=~mel_mask)
                     total_loss = mel_loss + mel_postnet_loss + d_loss + f_loss + e_loss
-                
-                d_l.append(d_loss.item())
-                f_l.append(f_loss.item())
-                e_l.append(e_loss.item())
+                     
+                t_l = total_loss.item()
                 if hp.vocoder=='WORLD':
-                    ap_l.append(ap_loss.item())
-                    sp_l.append(sp_loss.item())
-                    sp_p_l.append(sp_postnet_loss.item())
+                    ap_l = ap_loss.item()
+                    sp_l = sp_loss.item()
+                    sp_p_l = sp_postnet_loss.item()
                 else:
-                    mel_l.append(mel_loss.item())
-                    mel_p_l.append(mel_postnet_loss.item())
+                    m_l = mel_loss.item()
+                    m_p_l = mel_postnet_loss.item()
+                d_l = d_loss.item()
+                f_l = f_loss.item()
+                e_l = e_loss.item()
                 
     
                 # Run vocoding and plotting spectrogram only when the vocoder is defined

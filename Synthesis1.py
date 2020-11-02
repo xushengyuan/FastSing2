@@ -7,6 +7,7 @@ from tqdm import tqdm
 import soundfile as sf
 from parsevsqx import vsqx2notes
 import random
+import argparse
 import torch
 from stft import TacotronSTFT
 
@@ -184,7 +185,12 @@ def convert(src):
 prepare_dict()
 # main()
 
-words,begin,end = vsqx2notes(sys.argv[1])
+parser = argparse.ArgumentParser()
+parser.add_argument('--step', type=int, default=124000)
+parser.add_argument('--vsqx', type=str, default='in.vsqx')
+args = parser.parse_args()
+
+words,begin,end = vsqx2notes(args.vsqx)
 
 # x, _fs = sf.read(sys.argv[2])
 # refer_mel=get_mel(x)
@@ -269,5 +275,5 @@ for i in range(len(con1s)):
 
 os.environ['MKL_SERVICE_FORCE_INTEL']='true'
     
-os.system('CUDA_VISIBLE_DEVICES=0 python synthesize.py')
+os.system('CUDA_VISIBLE_DEVICES=0 python synthesize.py --step=%d'%args.step)
 

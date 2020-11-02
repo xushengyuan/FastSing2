@@ -14,6 +14,13 @@ class ScheduledOptim():
         self._update_learning_rate()
         self._optimizer.step()
 
+    def get_learning_rate(self):
+        learning_rate = 0.0
+        for param_group in self._optimizer.param_groups:
+            learning_rate = param_group['lr']
+
+        return learning_rate
+    
     def zero_grad(self):
         # print(self.init_lr)
         self._optimizer.zero_grad()
@@ -26,7 +33,7 @@ class ScheduledOptim():
     def _update_learning_rate(self):
         ''' Learning rate scheduling per step '''
         self.n_current_steps += 1
-        #lr = self.init_lr * self._get_lr_scale()
+        lr = self.init_lr * self._get_lr_scale() * hp.learning_rate_ratio
         lr=hp.learning_rate
 
         for param_group in self._optimizer.param_groups:

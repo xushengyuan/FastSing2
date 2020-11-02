@@ -11,11 +11,6 @@ class FastSpeech2Loss(nn.Module):
         self.mae_loss = nn.L1Loss()
 
     def forward(self, log_d_predicted, log_d_target, p_predicted, p_target, e_predicted, e_target, mel_output=None, mel_postnet_output=None, mel_target=None,ap_output=None, sp_output=None, sp_postnet_output=None, ap_target=None,sp_target=None,src_mask=None, mel_mask=None,ap_mask=None,sp_mask=None):
-        src_mask=torch.logical_not(src_mask)
-        sp_mask=torch.logical_not(sp_mask)
-        ap_mask=torch.logical_not(ap_mask)
-#         print(src_mask)
-#         print(src_mask.shape,sp_mask.shape,ap_mask.shape)
         log_d_target.requires_grad = False
         p_target.requires_grad = False
         e_target.requires_grad = False
@@ -27,12 +22,12 @@ class FastSpeech2Loss(nn.Module):
 #             print(sp_mask)
 #             print(sp_output.shape,sp_target.shape)
             #print(log_d_predicted,log_d_target)
-            log_d_predicted = log_d_predicted.masked_select(src_mask)
-            log_d_target = log_d_target.masked_select(src_mask)
-            p_predicted = p_predicted.masked_select(sp_mask)
-            p_target = p_target.masked_select(sp_mask)
-            e_predicted = e_predicted.masked_select(sp_mask)
-            e_target = e_target.masked_select(sp_mask)
+            #log_d_predicted = log_d_predicted.masked_select(src_mask)
+            #log_d_target = log_d_target.masked_select(src_mask)
+            #p_predicted = p_predicted.masked_select(sp_mask)
+            #p_target = p_target.masked_select(sp_mask)
+            #e_predicted = e_predicted.masked_select(sp_mask)
+            #e_target = e_target.masked_select(sp_mask)
         else:
             mel_target.requires_grad = False
             log_d_predicted = log_d_predicted.masked_select(src_mask)
@@ -52,11 +47,10 @@ class FastSpeech2Loss(nn.Module):
         #print(e_predicted,e_target)
         
         if hp.vocoder=='WORLD':
-            sp_output = sp_output.masked_select(sp_mask.unsqueeze(2).expand(-1,-1,hp.n_sp_channels))
-            ap_output = ap_output.masked_select(ap_mask.unsqueeze(2).expand(-1,-1,hp.n_ap_channels))
-            ap_target = ap_target.masked_select(ap_mask.unsqueeze(2).expand(-1,-1,hp.n_ap_channels))
-            sp_postnet_output = sp_postnet_output.masked_select(sp_mask.unsqueeze(2).expand(-1,-1,hp.n_sp_channels))
-            sp_target = sp_target.masked_select(sp_mask.unsqueeze(2).expand(-1,-1,hp.n_sp_channels))
+#             sp = sp_output.masked_select(sp_mask.unsqueeze(-1))
+#             ap = ap_output.masked_select(ap_mask.unsqueeze(-1))
+#             sp_postnet_output = sp_postnet_output.masked_select(sp_mask.unsqueeze(-1))
+#             sp_target = sp_target.masked_select(sp_mask.unsqueeze(-1))
 
             ap_loss = self.mse_loss(ap_output, ap_target)
 #             print(sp_output.shape,sp_target.shape)

@@ -13,8 +13,8 @@ import soundfile as sf
 import text
 import hparams as hp
 
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-device='cuda'
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#device='cpu'
 def get_alignment(tier):
     sil_phones = ['sil', 'sp', 'spn']
 
@@ -51,7 +51,8 @@ def process_meta(meta_path):
         name = []
         for line in f.readlines():
             n = line.strip('\n')
-            name.append(n)
+            if os.path.isfile(os.path.join(hp.preprocessed_path,"{}-{}.npz".format(hp.dataset, n))):
+                name.append(n)
         return name
 
 def get_param_num(model):
@@ -69,7 +70,7 @@ def plot_data(data, titles=None, filename=None):
         return ax
 
     for i in range(len(data)):
-        spectrogram, pitch, energy = data[i]
+        spectrogram, pitch, pitch_norm, energy = data[i]
 #         spectrogram=np.swapaxes(spectrogram,0,1)
         axes[i][0].imshow(spectrogram, origin='lower')
         axes[i][0].set_aspect(2.5, adjustable='box')
@@ -79,11 +80,14 @@ def plot_data(data, titles=None, filename=None):
         axes[i][0].set_anchor('W')
         
         ax1 = add_axis(fig, axes[i][0])
+        ax1.plot(pitch_norm, color='red', alpha=0.5)
         ax1.plot(pitch, color='tomato')
         ax1.set_xlim(0, spectrogram.shape[1])
-        ax1.set_ylim(0, hp.f0_max)
+        ax1.set_ylim(hp.f0_min, hp.f0_max)
         ax1.set_ylabel('F0', color='tomato')
         ax1.tick_params(labelsize='x-small', colors='tomato', bottom=False, labelbottom=False)
+        
+        
         
         ax2 = add_axis(fig, axes[i][0], 1.2)
         ax2.plot(energy, color='darkviolet')
@@ -96,6 +100,7 @@ def plot_data(data, titles=None, filename=None):
     plt.savefig(filename, dpi=200)
     plt.close()
 
+
 def get_mask_from_lengths(lengths, max_len=None):
     batch_size = lengths.shape[0]
     if max_len is None:
@@ -107,13 +112,7 @@ def get_mask_from_lengths(lengths, max_len=None):
     return mask
 
 def get_waveglow():
-    waveglow = torch.hub.load('nvidia/DeepLearningExamples:torchhub', 'nvidia_waveglow')
-    waveglow = waveglow.remove_weightnorm(waveglow)
-    waveglow.eval()
-    for m in waveglow.modules():
-        if 'Conv' in str(type(m)):
-            setattr(m, 'padding_mode', 'zeros')
-
+    waveglow = None
     return waveglow
 
 def waveglow_infer(mel, waveglow, path):
@@ -133,6 +132,7 @@ def melgan_infer(mel, melgan, path):
 def world_infer(ap,sp,f0):
 #     print(ap.shape,sp.shape,f0.shape)
 
+    f0=np.where(f0<=41,0.0,f0)
     f0=440.0*2**((f0-69)/12)
 
     arr1=[]
@@ -144,28 +144,63 @@ def world_infer(ap,sp,f0):
                      sp[i])
         arr1.append(y_hat)
     sp=np.stack(arr1)
-#     plt.matshow(sp)
-#     plt.cla()
-
+    
+#     print(sp)
+    
+    arr1_=[]
+    for i in range(sp.shape[1]):
+        x=np.arange(sp.shape[0]*2)
+        y_hat=np.interp(x,
+                        np.linspace(0,sp.shape[0]*2,sp.shape[0]),
+                       sp[:,i])
+        arr1_.append(y_hat)
+    sp=np.swapaxes(np.stack(arr1_),0,1)
+#     print(sp)
+    sp=np.exp(sp)
+#     print(sp)
+    
     arr2=[]
     for i in range(ap.shape[0]):
         arr2.append(np.interp(np.arange(1025),
                      np.linspace(0,1025,32),
                      ap[i]))
     ap=np.stack(arr2)
+    
+#     print(ap)
 #     plt.matshow(ap)
 #     plt.savefig('out_ap.png')
-    sp=np.exp(sp)
+    
+    
+    arr2_=[]
+    for i in range(ap.shape[1]):
+        x=np.arange(ap.shape[0]*2)
+        y_hat=np.interp(x,
+                        np.linspace(0,ap.shape[0]*2,ap.shape[0]),
+                       ap[:,i])
+        arr2_.append(y_hat)
+    ap=np.swapaxes(np.stack(arr2_),0,1)
+    
+    
+    
+    f0=np.interp(np.arange(f0.shape[0]*2),np.linspace(0,f0.shape[0]*2,f0.shape[0]),f0)
 #         ap=(ap+18.0)/20.0
     #     print(ap.max(),ap.min(),ap.mean())
 
 #     print(f0.shape,sp.shape,ap.shape)
+    print(f0.shape,sp.shape,ap.shape)
+    
     length=min(f0.shape[0],sp.shape[0],ap.shape[0])
     f0=f0[:length]
     sp=sp[:length]
     ap=ap[:length]
 #     print(f0.shape,sp.shape,ap.shape)
-    y = pw.synthesize(f0.astype(np.float64), sp.astype(np.float64), ap.astype(np.float64), 32000, 8.0)
+    f0=f0.astype(np.float64).copy(order='C')
+#     print(f0)
+    sp=sp.astype(np.float64).copy(order='C')
+#     print(sp)
+    ap=ap.astype(np.float64).copy(order='C')
+#     print(ap)
+    y = pw.synthesize(f0,sp ,ap , 32000, 4.0)
 #     sf.write(path,y,32000)
     return y
 # sp=np.load('/ssd/mu_yao/preprocessed/fastsing_dataset/sp/fastsing_dataset-sp-012_13.npy')
